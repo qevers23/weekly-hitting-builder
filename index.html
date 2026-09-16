@@ -91,9 +91,12 @@
   .offrow .nm{font-size:26px;font-weight:900;text-transform:uppercase;color:var(--ghost);line-height:1}
   .offrow .tx{font-size:15px;color:var(--muted)}
 
-  .footer{border-top:2px solid var(--ink);margin-top:2px;padding-top:12px}
-  .footer .tokens{font-size:13.5px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;line-height:1.5}
-  .footer .note{font-size:13.5px;font-style:italic;color:var(--muted);line-height:1.55;margin-top:9px}
+  .notes{border:2px solid var(--ink);padding:18px 20px;margin-top:14px}
+  .notes .lbl{background:var(--ink);color:var(--paper);font-size:10px;font-weight:900;letter-spacing:.14em;
+              text-transform:uppercase;padding:6px 10px;display:inline-block;margin-bottom:12px}
+  /* pre-wrap so the paragraph breaks a coach types with Enter actually show;
+     paired with the innerText read in the input handler, which keeps them */
+  .notes .pad{font-size:13.5px;line-height:1.7;min-height:110px;white-space:pre-wrap}
 
   /* ---------------- editing ---------------- */
   [data-p]{outline:none}
@@ -163,9 +166,9 @@
     .offrow{padding:8px 0 7px;gap:16px}
     .offrow .nm{font-size:15px}
     .offrow .tx{font-size:9.5px}
-    .footer{padding-top:8px}
-    .footer .tokens{font-size:9px}
-    .footer .note{font-size:9px;margin-top:6px}
+    .notes{padding:10px 12px;margin-top:8px;border-width:1.5px}
+    .notes .lbl{font-size:7.5px;padding:4px 8px;margin-bottom:8px}
+    .notes .pad{font-size:9px;line-height:1.6;min-height:80px}
   }
   @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style></head>
@@ -240,8 +243,8 @@ function blankState(){
     fieldName:"On Field",
     days: DAY_NAMES.map((n,i) => blankDay(n, i < 6)),
     offText:"Off",
-    footer:"",
-    footnote:""
+    notesLabel:"Additional notes",
+    notes:""
   };
 }
 
@@ -283,8 +286,8 @@ function seedFallPlan(){
     "RH Breaking Ball", [["Offset Closed","10 swings"],["Step Behind","10 swings"]],
     "LH Breaking Ball", [["Pivot Picks","10 swings"],["Flow Drill","9 swings"]],
     "Scrimmage", "");
-  S.footer = "Bat speed: Mon / Thu  •  Bat to ball: Tue / Wed  •  Load: Mon / Wed  •  Stride: Tue / Thu  •  Blend: Fri / Sat";
-  S.footnote = "Both cages run the same drills each day — only the angle and pitch shape change. Blend days count toward both: on scrimmage days the goal is competing in the game, and a little of everything is how you get ready for that. Net: 3 bat speed days, 3 bat to ball days.";
+  S.notes = "Bat speed: Mon / Thu  •  Bat to ball: Tue / Wed  •  Load: Mon / Wed  •  Stride: Tue / Thu  •  Blend: Fri / Sat\n\n"
+    + "Both cages run the same drills each day — only the angle and pitch shape change. Blend days count toward both: on scrimmage days the goal is competing in the game, and a little of everything is how you get ready for that. Net: 3 bat speed days, 3 bat to ball days.";
   return S;
 }
 
@@ -302,7 +305,14 @@ function loadLib(){
       if(lib && lib.plans && Object.keys(lib.plans).length){
         lib.accent = lib.accent || "#FFA300";
         if(!lib.plans[lib.current]) lib.current = Object.keys(lib.plans)[0];
-        for(const p of Object.values(lib.plans)) p.state = Object.assign(blankState(), p.state);
+        for(const p of Object.values(lib.plans)){
+          p.state = Object.assign(blankState(), p.state);
+          // the footer strip became one notes block -- carry the old text over
+          // rather than dropping whatever a coach already wrote down there
+          if(!p.state.notes && (p.state.footer || p.state.footnote))
+            p.state.notes = [p.state.footer, p.state.footnote].filter(Boolean).join("\n\n");
+          delete p.state.footer; delete p.state.footnote;
+        }
         return lib;
       }
     }
@@ -415,10 +425,8 @@ function render(){
     <div class="week">${days}</div>
     ${offRow}
 
-    <div class="footer">
-      <div class="tokens">${ed("footer", S.footer, "How the focus days and phases distribute across the week", "")}</div>
-      <div class="note">${ed("footnote", S.footnote, "The one paragraph a coach reading this cold needs: what repeats, what changes, and what the week adds up to", "")}</div>
-    </div>`;
+    <div class="notes"><span class="lbl">${ed("notesLabel", S.notesLabel, "Label")}</span>
+      ${edBlock("notes", S.notes, "Anything else the staff needs: how the focus days and phases distribute across the week, equipment you actually have, weather plan, who throws, and what to do when a cage or machine is down.", "pad")}</div>`;
 
   document.querySelectorAll("[data-p]").forEach(n => n.setAttribute("contenteditable", on));
 }
@@ -455,7 +463,7 @@ function syncCells(n){
 document.addEventListener("input", e=>{
   const el = e.target.closest("[data-p]");
   if(!el) return;
-  setPath(el.dataset.p, el.textContent);
+  setPath(el.dataset.p, el.classList.contains("pad") ? el.innerText : el.textContent);
   save();
 });
 document.addEventListener("paste", e=>{           // keep Word styling out of the sheet
